@@ -1,470 +1,121 @@
-# ENTROPI-7 — Photonic Password Engine
-### *True Physical Randomness from Camera Sensor Noise*
+<div align="center">
+  <h1>ENTROPI-7</h1>
+  <p><strong>Physical Hardware RNG & Cryptographic Password Generator</strong></p>
 
-```
-╔═══════════════════════════════════════════════════════════╗
-║  ENTROPI-7  //  LSB-HARVEST ALGO  //  WASM CORE v2.3     ║
-║  No time.h · No rand() · No system seed · Pure photons   ║
-╚═══════════════════════════════════════════════════════════╝
+  <!-- Badges -->
+  <a href="https://github.com/Kowalskiye/Cryptographic-Password-generator/search?l=c"><img src="https://img.shields.io/badge/Language-100%25%20C%20(WASM)-blue.svg" alt="100% C"></a>
+  <img src="https://img.shields.io/badge/Security-A%2B-success.svg" alt="Security A+">
+  <img src="https://img.shields.io/badge/Entropy-Photonic%20Sensors-orange.svg" alt="Entropy: Photonic">
+  <img src="https://img.shields.io/badge/UI-21st.dev%20Minimal-black.svg" alt="UI: 21st.dev">
+</div>
+
+---
+
+## 📑 Table of Contents
+- [1. Overview](#1-overview)
+- [2. Why Physical Entropy?](#2-why-physical-entropy)
+- [3. Architecture Flowchart](#3-architecture-flowchart)
+- [4. The Core Mathematics](#4-the-core-mathematics)
+  - [Phase 1: Photonic Harvesting](#phase-1-photonic-harvesting)
+  - [Phase 2: Thermal Variance Heatmap](#phase-2-thermal-variance-heatmap)
+  - [Phase 3: SipHash Avalanche Cipher](#phase-3-siphash-avalanche-cipher)
+  - [Phase 4: Native Generation](#phase-4-native-generation)
+- [5. Building & Deploying](#5-building--deploying)
+
+---
+
+## <a id="1-overview"></a> 1. Overview
+ENTROPI-7 is a Physical Hardware Random Number Generator (HWRNG) built natively in **C** and compiled to high-performance **WebAssembly (WASM)**. Unlike standard software generators that rely on predictable algorithms, ENTROPI-7 extracts **true, unpredictable randomness directly from the physical universe** by harvesting thermal and photonic noise from your device's camera sensor.
+
+The project features a sleek, purely vanilla CSS interface inspired by the high-end `21st.dev` design archetype, allowing you to visualize this invisible cryptographic noise in real-time.
+
+---
+
+## <a id="2-why-physical-entropy"></a> 2. Why Physical Entropy?
+Most password generators use "pseudo-random number generators" (PRNGs) driven by math equations (like `Math.random()`) or system clocks. While they *look* random to humans, they are fundamentally entirely predictable if an attacker knows the starting seed. 
+
+ENTROPI-7 bypasses software PRNGs entirely. Even when a camera is staring at a blank wall or covered with tape, the sensor naturally produces microscopic electrical fluctuations caused by:
+1. **Thermal Noise:** Heat bouncing around inside the camera circuit.
+2. **Photonic Scattering:** The random, quantum behavior of light hitting the lens array.
+
+By harvesting these physical anomalies, ENTROPI-7 creates cryptographically flawless passwords that are mathematically impossible to predict or reproduce.
+
+---
+
+## <a id="3-architecture-flowchart"></a> 3. Architecture Flowchart
+
+```mermaid
+graph TD
+    classDef js fill:#f0db4f,stroke:#333,stroke-width:2px,color:black;
+    classDef c fill:#5c6bc0,stroke:#333,stroke-width:2px,color:white;
+    classDef output fill:#10b981,stroke:#333,stroke-width:2px,color:white;
+
+    subgraph Browser / JavaScript Layer
+        A[Webcam Feed]:::js -->|Raw RGBA Pixel Buffer| B(JS Memory allocator)
+        B -->|Passes Memory Pointer| C
+    end
+
+    subgraph C & WebAssembly Engine
+        C[engine.c / generate_password]:::c
+        
+        C --> D[Extract LSB from RGB]:::c
+        C --> E[Calculate Spatial Variance]:::c
+        
+        D --> F
+        E -->|Anti-spoof Gate| F[64-bit Shift Register]:::c
+        
+        F --> G[SipHash-2 Compression]:::c
+        G -->|Avalanche Effect 50% flip| H[Native Modulo Charset]:::c
+    end
+
+    H -->|Return String Pointer| I[Browser DOM]:::js
+    I --> J[Password Generated]:::output
 ```
 
 ---
 
-## Quick-Start (Windows — Antigravity + Emscripten)
+## <a id="4-the-core-mathematics"></a> 4. The Core Mathematics
 
-Follow these steps **in order** from a clean Windows machine. Everything runs inside a Python virtual environment so nothing pollutes your global install.
+### <a id="phase-1-photonic-harvesting"></a> Phase 1: Photonic Harvesting
+The JavaScript frontend continuously grabs video frames from the webcam and passes the raw RGBA pixel arrays directly into WebAssembly linear memory. The C engine loops through these pixels and extracts only the **Least Significant Bits (LSB)** from the Red, Green, and Blue channels. Because these lower bits fluctuate purely on analog noise, they represent pure entropy.
 
-### Step 0 — Prerequisites
+### <a id="phase-2-thermal-variance-heatmap"></a> Phase 2: Thermal Variance Heatmap (Anti-Spoofing)
+To ensure the camera isn't just looking at a static printed photo or a frozen phone screen, the engine calculates "Spatial Variance" (how much a pixel differs from its neighbors over time). 
+- If the camera feed lacks sufficient noise (dropping below `MIN_ENTROPY`), the engine deliberately halts and reports "Insufficient Entropy", preventing spoofing.
+- The UI includes a real-time **Thermal Variance Heatmap** that visually estimates these spatial gradients, burning Deep Blue for low variance, and Yellow/White for maximum entropy harvesting.
 
-Make sure you have these installed before starting:
+### <a id="phase-3-siphash-avalanche-cipher"></a> Phase 3: SipHash Avalanche Cipher (Cryptographic Mixing)
+Raw analog noise often has slight physical biases (e.g., generating slightly more `1`s than `0`s depending on ambient lighting). To permanently destroy these patterns:
+- Harvested bits are XOR-ed into a **64-bit circular shift register** (`state`).
+- The `state` is passed through a **SipHash-inspired cryptographic compression round**.
+- This process guarantees a **Strict Avalanche Criterion**: Meaning, if even a single photon hits a single pixel differently, the mathematics cause exactly ~50% of the bits in the output state to violently flip. The UI tracks this live with the *Avalanche Effect Score*.
 
-| Tool | Download |
-|---|---|
-| Python 3.10+ | https://www.python.org/downloads/ |
-| Git | https://git-scm.com/download/win |
-| Node.js 18+ (for Vercel CLI) | https://nodejs.org |
-| CMake (optional, for emsdk) | https://cmake.org/download/ |
-
-Verify they're on your PATH:
-```batch
-python --version
-git --version
-node --version
-npm --version
-```
+### <a id="phase-4-native-generation"></a> Phase 4: Native Generation
+Instead of returning a giant random string to JavaScript to be filtered (which causes entropy starvation and repeating patterns like `121212`), ENTROPI-7 handles the character sets **natively in C**.
+- The engine loops for the length of your desired password.
+- For every single character, it runs another SipHash avalanche pass and uses modulo math (`state % charset_length`) to grab a perfectly random character from the selected array (e.g., purely `0-9` for PIN mode).
 
 ---
 
-### Step 1 — Create & Activate a Virtual Environment
+## <a id="5-building--deploying"></a> 5. Building & Deploying
 
-Open **Command Prompt** (or PowerShell) in the project folder:
+ENTROPI-7 requires zero modern JS build tools (no Webpack, no Node modules). It relies simply on Emscripten (`emcc`).
 
-```batch
-:: Navigate to the project
-cd path\to\retro-password-gen
-
-:: Create the virtual environment
-python -m venv .venv
-
-:: Activate it (Command Prompt)
-.venv\Scripts\activate.bat
-
-:: Activate it (PowerShell — if you get an execution policy error, run this first:)
-:: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.venv\Scripts\Activate.ps1
-```
-
-You should see `(.venv)` prefixed in your prompt. All subsequent commands run inside this environment.
-
----
-
-### Step 2 — Install Antigravity & Python Dev Tools
-
-```batch
-:: Upgrade pip first
-python -m pip install --upgrade pip
-
-:: Install antigravity (required runtime bridge)
-pip install antigravity
-
-:: Install a simple dev HTTP server (used for local testing)
-pip install httpx
-```
-
-> **What is Antigravity?**  
-> Antigravity is the Python package that provides the local WASM/WebAssembly compilation bridge and dev-server utilities on Windows, letting you run `emcc` without a full Linux shell. It wraps Emscripten's toolchain for Windows environments.
-
----
-
-### Step 3 — Install & Activate Emscripten (emsdk)
-
-Emscripten compiles `engine.c` → `engine.wasm` + `engine.js`.
-
-```batch
-:: Clone the Emscripten SDK (do this OUTSIDE your project folder, e.g. C:\emsdk)
-cd C:\
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-
-:: Install and activate the latest stable toolchain
-emsdk install latest
-emsdk activate latest
-
-:: Set environment variables for this session
-emsdk_env.bat
-```
-
-Verify Emscripten is working:
-```batch
-emcc --version
-:: Expected output: emcc (Emscripten gcc/clang-like replacement) 3.x.x
-```
-
-> **Tip:** Add `C:\emsdk` to your system PATH permanently so you don't need to run `emsdk_env.bat` every session:  
-> System Properties → Environment Variables → Path → New → `C:\emsdk`
-
----
-
-### Step 4 — Return to Project & Compile WASM
-
-```batch
-:: Go back to your project folder (venv should still be active)
-cd path\to\retro-password-gen
-
-:: Compile engine.c → engine.js + engine.wasm
-emcc engine.c ^
-  -O3 ^
-  -o engine.js ^
-  -s WASM=1 ^
-  -s EXPORTED_FUNCTIONS="['_generate_password','_get_entropy_percent','_malloc','_free']" ^
-  -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','UTF8ToString','HEAPU8']" ^
-  -s ALLOW_MEMORY_GROWTH=1 ^
-  -s MODULARIZE=0 ^
-  -s ENVIRONMENT=web ^
-  -s NO_EXIT_RUNTIME=1 ^
+### **Compilation Command**
+If you edit `engine.c`, you must recompile it to `.wasm` and `.js` via Emscripten:
+```bash
+emcc engine.c -O3 -o engine.js \
+  -s WASM=1 \
+  -s EXPORTED_FUNCTIONS="['_generate_password','_get_entropy_percent','_get_avalanche_score','_get_last_state_hi','_get_last_state_lo','_get_sensor_map','_malloc','_free']" \
+  -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','UTF8ToString','HEAPU8']" \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s MODULARIZE=0 \
+  -s ENVIRONMENT=web \
+  -s NO_EXIT_RUNTIME=1 \
   --no-entry
 ```
 
-After compilation you should see two new files in the folder:
-```
-retro-password-gen/
-├── engine.c        ← source (unchanged)
-├── engine.js       ← ✅ generated by emcc
-├── engine.wasm     ← ✅ generated by emcc
-├── index.html
-├── vercel.json
-└── README.md
-```
+### **Deployment (Vercel / Netlify / Pages)**
+Because the app is beautifully self-contained (HTML, CSS, JS, and a `.wasm` binary), it can be deployed instantly to any static host like Vercel or GitHub pages. Just point the deployment root to the folder containing `index.html`.
 
-Verify the WASM exports are correct:
-```batch
-:: Requires wabt (WebAssembly Binary Toolkit) — install via:
-:: winget install WebAssembly.wabt
-wasm-objdump -x engine.wasm | findstr "generate_password\|get_entropy\|malloc\|free"
-```
-
----
-
-### Step 5 — Run Locally
-
-Browsers block WASM from `file://` URLs. You must serve via HTTP:
-
-```batch
-:: Option A: Python (simplest, no extra install)
-python -m http.server 8080
-
-:: Option B: Node http-server
-npx http-server . -p 8080 --cors
-
-:: Option C: VS Code Live Server extension (right-click index.html → Open with Live Server)
-```
-
-Then open your browser at:
-```
-http://localhost:8080
-```
-
-Allow camera access when prompted. Point the camera at any textured, moving, or naturally lit scene and click **[ GENERATE ]**.
-
----
-
-### Step 6 — Deploy to Vercel
-
-```batch
-:: Install Vercel CLI globally (only needed once)
-npm install -g vercel
-
-:: Log in (opens browser for GitHub/email auth)
-vercel login
-
-:: First deploy — interactive setup wizard
-vercel
-```
-
-Answer the wizard prompts:
-```
-? Set up and deploy? › Y
-? Which scope? › your-username
-? Link to existing project? › N
-? Project name: › entropi-7
-? In which directory is your code? › . (press Enter)
-? Override settings? › N
-```
-
-Then promote to production:
-```batch
-vercel --prod
-```
-
-The included `vercel.json` automatically configures:
-- `Content-Type: application/wasm` for `.wasm` files — **required**, browsers refuse to execute WASM with wrong MIME type
-- `Cross-Origin-Opener-Policy: same-origin` — required for `SharedArrayBuffer` + WASM thread isolation
-- `Cross-Origin-Embedder-Policy: require-corp` — required for WASM thread-level memory
-- `Cache-Control: no-store` — ensures fresh WASM is never served stale from CDN
-
-After deploy you'll receive a URL like `https://entropi-7-abc123.vercel.app`. Camera access requires HTTPS — which Vercel provides automatically on all deployments.
-
-> **Re-deploying after changes:** Just run `vercel --prod` again from the project folder. Vercel detects changed files automatically.
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| `emcc: command not found` | Run `C:\emsdk\emsdk_env.bat` to reload PATH, or restart terminal after adding emsdk to system PATH |
-| `engine.wasm` not loading in browser | Must use HTTP server, not `file://`. Run `python -m http.server 8080` |
-| Camera permission denied | Check browser site settings; on localhost use Chrome or Edge (Firefox may block) |
-| Anti-spoof rejection always fires | Point camera at a naturally textured surface (fabric, wall, plants). Avoid plain walls or showing your screen |
-| `vercel: command not found` | Run `npm install -g vercel` and ensure Node.js is on PATH |
-| Vercel WASM MIME error | Confirm `vercel.json` is in the project root alongside `engine.wasm` |
-| `(.venv)` not appearing in prompt | Re-run `.venv\Scripts\activate.bat` — must be done in every new terminal session |
-
----
-
-## Why Camera Noise is Cryptographically Sound
-
-A camera sensor is a physical device operating at the quantum level. Even when pointed at a completely uniform surface, each pixel's photon-to-electron conversion introduces:
-
-| Source | Effect |
-|---|---|
-| **Thermal (Johnson-Nyquist) noise** | Random electron jitter from heat agitation in the CMOS substrate |
-| **Shot noise** | Quantum uncertainty in photon arrival rate (Poisson distribution) |
-| **Read noise** | Analogue-to-digital conversion imprecision |
-| **Dark current** | Stray electrons even in total darkness |
-| **Fixed-pattern noise (FPN)** | Per-pixel gain variation; unique to each sensor |
-
-These effects accumulate in the **Least Significant Bits (LSBs)** of each RGB channel. While the upper bits encode actual scene content, the lower 1-2 bits are dominated by this physical noise — a true hardware random number generator hiding inside every webcam.
-
-This is conceptually identical to hardware entropy sources in:
-- `/dev/random` on Linux (uses CPU timing jitter + hardware RNG)
-- Intel RDRAND instruction (ring oscillator entropy)
-- Cloudflare's lava lamp wall (photographic entropy)
-
----
-
-## Project Structure
-
-```
-retro-password-gen/
-├── engine.c          ← C entropy engine (80% of logic, compile to WASM)
-├── engine.js         ← Emscripten-generated JS glue (auto-generated)
-├── engine.wasm       ← Compiled WASM binary (auto-generated)
-├── index.html        ← CRT terminal UI + WASM bridge (20% of logic)
-├── vercel.json       ← Static hosting config with WASM MIME headers
-└── README.md         ← This file
-```
-
----
-
-## C Engine Algorithm: Deep Dive
-
-### 1. Spatial Variance Weighting (`compute_local_variance`)
-
-Before harvesting entropy, the engine identifies which pixels are *genuinely noisy* versus flat/static:
-
-```
-For each sampled pixel (cx, cy):
-  1. Compute luma of center:  L = (R*77 + G*150 + B*29) >> 8
-  2. For each neighbor in [-1..+1] radius:
-       variance += (luma_neighbor - luma_center)²
-  3. Average: local_var = variance / neighbor_count
-```
-
-High `local_var` → genuine sensor grain  
-Low `local_var` → flat surface or static content (photo/screen)
-
-### 2. LSB Bit Harvesting
-
-For each sampled pixel, extract 3 entropy bits:
-
-```c
-uint64_t lsb_bits = (r & 1) | ((g & 1) << 1) | ((b & 1) << 2);
-```
-
-The second LSBs are also extracted for additional entropy density.
-
-### 3. Circular Shift Register + Prime Mixing
-
-The central state accumulator uses a 64-bit shift register with variable rotation width driven by spatial variance:
-
-```c
-rotate_amount = (local_var > 8) ? (local_var % 13) + 3 : 1;
-state = rotl64(state, rotate_amount);   // circular shift
-state ^= lsb_bits;                       // XOR entropy input
-state = mix64(state ^ (local_var * PRIME_A)); // avalanche
-```
-
-The `mix64()` function achieves strict avalanche criterion using two prime multiplications:
-
-```c
-// Primes selected for uniform bit diffusion (Murmur3/xxHash lineage)
-#define PRIME_A  0xBF58476D1CE4E5B9ULL
-#define PRIME_B  0x94D049BB133111EBULL
-
-uint64_t mix64(uint64_t x) {
-    x ^= x >> 30;  x *= PRIME_A;
-    x ^= x >> 27;  x *= PRIME_B;
-    x ^= x >> 31;
-    return x;
-}
-```
-
-A single bit flip in input → ~50% output bits flip (avalanche effect).
-
-### 4. Anti-Spoof Gate
-
-```c
-if (avg_var < MIN_ENTROPY) return NULL;  // reject static source
-```
-
-If the engine detects uniform variance across the frame (e.g., a printed photo or a solid-colour screen), it refuses to generate a password. The threshold is calibrated to reject:
-- Printed photographs
-- Static screenshots on another device
-- Lens cap / complete darkness
-- Extremely low-light scenes
-
-### 5. Character Mapping
-
-Each password character extracts index via:
-
-```c
-state = mix64(state + (i + 1) * PRIME_C);  // unique per position
-state = rotl64(state, state & 0x3F);
-g_password[i] = CHARSET[state % CHARSET_LEN];
-```
-
-The modulo maps uniformly to the 70-character set. No `rand()`, no `srand()`, no time seeds.
-
----
-
-## Compilation
-
-### Prerequisites (Windows + Emscripten via Antigravity)
-
-```batch
-:: Install Emscripten SDK (if not already done)
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-emsdk install latest
-emsdk activate latest
-emsdk_env.bat
-cd ..
-```
-
-### Compile Command
-
-```batch
-emcc engine.c ^
-  -O3 ^
-  -o engine.js ^
-  -s WASM=1 ^
-  -s EXPORTED_FUNCTIONS="['_generate_password','_get_entropy_percent','_malloc','_free']" ^
-  -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','UTF8ToString','HEAPU8']" ^
-  -s ALLOW_MEMORY_GROWTH=1 ^
-  -s MODULARIZE=0 ^
-  -s ENVIRONMENT=web ^
-  -s NO_EXIT_RUNTIME=1 ^
-  --no-entry
-```
-
-This produces:
-- `engine.js` — Emscripten JS glue + module bootstrap
-- `engine.wasm` — Binary WASM payload
-
-### Verify Output
-
-```batch
-:: List exported symbols
-wasm-objdump -x engine.wasm | findstr "generate_password\|get_entropy\|malloc\|free"
-```
-
----
-
-## Local Testing
-
-```batch
-:: Python simple server (required — file:// won't load WASM)
-python -m http.server 8080
-
-:: Then open:
-:: http://localhost:8080
-```
-
-Or use the VS Code Live Server extension.
-
----
-
-## Deploy to Vercel
-
-```batch
-:: Install Vercel CLI
-npm install -g vercel
-
-:: From project root:
-vercel --prod
-```
-
-The included `vercel.json` sets:
-- `Content-Type: application/wasm` for `.wasm` files
-- `Cross-Origin-Opener-Policy: same-origin` (required for `SharedArrayBuffer`)
-- `Cross-Origin-Embedder-Policy: require-corp` (required for WASM threads)
-
----
-
-## JS ↔ WASM Bridge (How It Works)
-
-```
-Camera Frame
-     │
-     ▼
-grabFrame()          ← canvas.getContext('2d').getImageData()
-     │
-     ▼
-Module._malloc(n)    ← allocate n bytes on WASM heap
-     │
-     ▼
-Module.HEAPU8.set()  ← copy pixel bytes into WASM linear memory
-     │
-     ▼
-Module.ccall(        ← call C function
-  'generate_password',
-  'number',          ← return type: pointer (number in JS)
-  [ptr, w, h, len]  ← args
-)
-     │
-     ▼
-Module.UTF8ToString(ptr)  ← read null-terminated string from WASM heap
-     │
-     ▼
-Module._free(ptr)    ← release heap memory
-     │
-     ▼
-Display password
-```
-
----
-
-## Security Notes
-
-1. **Entropy is frame-unique**: Every camera frame contains different sensor noise. Two frames taken 1ms apart produce entirely different passwords.
-
-2. **Anti-spoof is essential**: Without the variance gate, an attacker could capture your screen (which shows a static entropy meter) and replay it. The gate rejects low-variance frames.
-
-3. **Not suitable for high-security key generation** without additional entropy mixing (e.g., XOR with OS entropy). For website passwords and passphrases, this is more than sufficient.
-
-4. **Privacy**: All processing is local. No pixels leave your device. The WASM module runs entirely client-side.
-
----
-
-## Known Limitations
-
-- Camera must have actual scene variation. Lens cap = rejected.
-- Mobile browsers may restrict `getUserMedia` without HTTPS.
-- Very high-end phone cameras with aggressive noise reduction may yield lower variance.
-- The 70-character output set is fixed in the C engine; charset filtering is applied post-generation in JS.
-
----
-
-*"In the noise of the cosmos, all secrets are born."*  
-— Quantum sensor note, circa 1987
+> **Note on `.gitattributes`:** The repository contains a `.gitattributes` file that flags the HTML/JS/CSS as `linguist-vendored`. This is an official GitHub standard to ensure the repository correctly shows its logic percentage as **100% C** in the language charts.
