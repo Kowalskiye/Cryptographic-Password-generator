@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "name": "entropi-7",
+  "headers": [
+    {
+      "source": "/(.*)\\.wasm",
+      "headers": [
+        { "key": "Content-Type",                "value": "application/wasm" },
+        { "key": "Cross-Origin-Opener-Policy",  "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy","value": "require-corp" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy",  "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy","value": "require-corp" },
+        { "key": "Cache-Control",               "value": "no-store" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/",     "destination": "/index.html" }
+  ]
+}

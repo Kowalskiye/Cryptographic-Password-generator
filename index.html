@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ENTROPI-7 — Physical Hardware RNG</title>
+  <meta name="description" content="Generate cryptographically strong passwords from camera sensor noise using SipHash avalanche mixing."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════
+       MODERN MINIMAL RESET (Inspired by 21st.dev / Linear)
+    ═══════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:     #000000;
+      --bg-surface:  #09090b;
+      --bg-hover:    #18181b;
+      --border:      #27272a;
+      --border-hover:#3f3f46;
+      --text-main:   #fafafa;
+      --text-muted:  #a1a1aa;
+      --text-faint:  #52525b;
+      --accent:      #10b981;
+      --accent-dim:  rgba(16, 185, 129, 0.15);
+      --error:       #ef4444;
+      
+      --radius-sm:   6px;
+      --radius-md:   8px;
+      --radius-lg:   12px;
+    }
+
+    html, body {
+      width: 100%; min-height: 100vh;
+      background: var(--bg-base);
+      font-family: 'Geist', -apple-system, sans-serif;
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    body {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 40px 24px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       TYPOGRAPHY & UTILS
+    ═══════════════════════════════════════════════ */
+    .mono { font-family: 'Geist Mono', monospace; }
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; }
+    .text-muted { color: var(--text-muted); }
+    .tracking-tight { letter-spacing: -0.02em; }
+    .tracking-widest { letter-spacing: 0.1em; }
+    .uppercase { text-transform: uppercase; }
+    .font-medium { font-weight: 500; }
+    
+    /* ═══════════════════════════════════════════════
+       LAYOUT
+    ═══════════════════════════════════════════════ */
+    .container {
+      width: 100%; max-width: 1080px;
+      display: flex; flex-direction: column; gap: 32px;
+    }
+    
+    .header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .header h1 {
+      font-size: 1.5rem; font-weight: 500;
+      letter-spacing: -0.03em;
+    }
+    .header p {
+      color: var(--text-muted); font-size: 0.875rem;
+      margin-top: 4px;
+    }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 99px;
+      background: var(--bg-surface); border: 1px solid var(--border);
+      font-size: 0.75rem; font-weight: 500;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+    .dot.online { background: var(--accent); }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ═══════════════════════════════════════════════
+       COMPONENTS / CARDS
+    ═══════════════════════════════════════════════ */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .card-title {
+      font-size: 0.75rem; font-weight: 600;
+      color: var(--text-main);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .card-body { padding: 20px; }
+
+    /* ═══════════════════════════════════════════════
+       SENSORS & CANVASES
+    ═══════════════════════════════════════════════ */
+    .sensor-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .video-wrap {
+      position: relative;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    .video-wrap video, .video-wrap canvas {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .video-label {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      padding: 4px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);
+      font-size: 0.65rem; color: white;
+      display: flex; align-items: center;
+    }
+    .canvas-select {
+      background: transparent; border: none; color: white;
+      font-family: inherit; font-size: inherit; outline: none; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+    }
+    .canvas-select option { color: #000; }
+    
+    #frameCanvas { display: none; } /* Hidden working canvas */
+
+    /* ═══════════════════════════════════════════════
+       CONTROLS & SETTINGS
+    ═══════════════════════════════════════════════ */
+    .form-group {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-bottom: 16px;
+    }
+    .form-group:last-child { margin-bottom: 0; }
+    
+    .label-row {
+      display: flex; justify-content: space-between;
+    }
+    
+    select.input, input[type="range"] {
+      width: 100%;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: var(--radius-sm);
+      outline: none; transition: border 0.2s;
+    }
+    select.input {
+      padding: 10px 12px; font-size: 0.875rem; font-family: 'Geist', sans-serif;
+      cursor: pointer; -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    select.input:focus { border-color: var(--text-muted); }
+    
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      height: 6px; padding: 0;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--text-main); cursor: pointer;
+    }
+
+    button.btn-primary {
+      width: 100%;
+      background: var(--text-main);
+      color: var(--bg-base);
+      border: none; border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 0.875rem; font-weight: 500; font-family: 'Geist', sans-serif;
+      cursor: pointer; transition: transform 0.1s, opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    button.btn-primary:hover { opacity: 0.9; }
+    button.btn-primary:active { transform: scale(0.98); }
+    button.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.btn-secondary {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-main); padding: 8px 12px; border-radius: var(--radius-md);
+      font-size: 0.875rem; cursor: pointer; transition: background 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    button.btn-secondary:hover { background: var(--bg-hover); }
+
+    /* ═══════════════════════════════════════════════
+       METRICS & OUTPUT
+    ═══════════════════════════════════════════════ */
+    .metric-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .metric-row:last-child { border-bottom: none; padding-bottom: 0; }
+    
+    .password-display {
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      font-size: 1.5rem; word-break: break-all;
+      letter-spacing: 0.05em; min-height: 84px;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+    }
+    
+    .status-msg {
+      font-size: 0.75rem; color: var(--text-muted);
+      margin-top: 12px; text-align: center;
+      min-height: 18px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SHOW WORKING (MATH/LOGIC PANEL)
+    ═══════════════════════════════════════════════ */
+    .math-panel {
+      font-family: 'Geist Mono', monospace; font-size: 0.75rem;
+      background: var(--bg-base); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px;
+      color: var(--text-muted);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .math-row {
+      display: flex; flex-direction: column; gap: 4px;
+      border-bottom: 1px dashed var(--border); padding-bottom: 8px;
+    }
+    .math-row:last-child { border-bottom: none; padding-bottom: 0; }
+    
+    .math-label { color: var(--text-faint); font-size: 0.65rem; text-transform: uppercase; }
+    .math-value { color: var(--text-main); word-break: break-all; }
+    .math-highlight { color: var(--accent); }
+
+    .working-toggle {
+      width: 100%; background: none; border: 1px dashed var(--border);
+      color: var(--text-muted); padding: 8px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 0.75rem; margin-top: 16px;
+      transition: all 0.2s;
+    }
+    .working-toggle:hover { border-color: var(--text-faint); color: var(--text-main); }
+    #working-container { display: none; margin-top: 16px; }
+
+    /* ═══════════════════════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      body { padding: 20px 16px; }
+      .grid-layout { grid-template-columns: 1fr; }
+      .sensor-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .password-display { font-size: 1.2rem; padding: 16px; min-height: 64px; }
+      .math-panel { font-size: 0.7rem; padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- HEADER -->
+  <header class="header">
+    <div>
+      <h1 class="tracking-tight">ENTROPI-7</h1>
+      <p>True hardware entropy via camera sensor noise</p>
+    </div>
+    <div class="status-badge" id="engine-status">
+      <span class="dot" id="engine-dot"></span>
+      <span id="engine-text">Engine Offline</span>
+    </div>
+  </header>
+
+  <div class="grid-layout">
+    <!-- LEFT COLUMN -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      
+      <!-- SENSORS CARD -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Sensors</span>
+          <span class="text-xs text-muted mono" id="entropy-pct">0% Noise</span>
+        </div>
+        <div class="card-body">
+          <div class="sensor-grid">
+            <!-- Camera Feed -->
+            <div class="video-wrap">
+              <video id="camFeed" autoplay muted playsinline></video>
+              <div class="video-label mono">Sensor RGB</div>
+            </div>
+            <!-- LSB/Heatmap Canvas -->
+            <div class="video-wrap">
+              <canvas id="noiseCanvas"></canvas>
+              <div class="video-label mono" style="padding: 0 4px;">
+                <select id="renderMode" class="canvas-select mono">
+                  <option value="0">LSB Bitplane</option>
+                  <option value="1">Thermal Variance Heatmap</option>
+                </select>
+                <svg width="10" height="10" fill="none" class="text-white" style="margin-left:2px" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
+            </div>
+          </div>
+          <div class="status-msg" id="sensor-status">Waiting for camera...</div>
+        </div>
+      </div>
+
+      <!-- MATH & CRYPTO TRACE -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Cryptographic Trace</span>
+        </div>
+        <div class="card-body">
+          <div class="metric-row">
+            <span class="text-sm text-muted">Avalanche Effect Score</span>
+            <span class="text-sm mono font-medium" id="avalanche-score">--%</span>
+          </div>
+          
+          <button class="working-toggle mono" onclick="toggleWorking()">[+] View Internal Engine State</button>
+          
+          <div id="working-container">
+            <div class="math-panel">
+              <div class="math-row">
+                <span class="math-label">Shift Register Logic</span>
+                <span><span class="math-highlight">state</span> ^= lsb_harvest;</span>
+                <span><span class="math-highlight">state</span> = siphash_round(state);</span>
+              </div>
+              <div class="math-row">
+                <span class="math-label">Current 64-bit State (Hex)</span>
+                <span class="math-value" id="trace-state">0x0000000000000000</span>
+              </div>
+              <div class="math-row">
+                <span class="math-label">Last Extraction Pass</span>
+                <span class="math-value" id="trace-extraction">Awaiting generation...</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      
+      <!-- GENERATOR CARD -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Generator Output</span>
+          <button class="btn-secondary text-xs" onclick="copyPassword()" id="copy-btn">Copy</button>
+        </div>
+        <div class="card-body">
+          <div class="password-display mono" id="password-display">
+            <span class="text-muted text-sm">Output will appear here</span>
+          </div>
+          
+          <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div class="form-group">
+              <div class="label-row">
+                <label class="text-sm font-medium">Password Length</label>
+                <span class="mono text-sm" id="len-display">20</span>
+              </div>
+              <input type="range" id="passLen" min="8" max="64" value="20">
+            </div>
+
+            <div class="form-group">
+              <label class="text-sm font-medium">Character Set</label>
+              <select class="input" id="charsetMode">
+                <option value="full">Full (A-Z, a-z, 0-9, Symbols)</option>
+                <option value="alpha">Letters Only</option>
+                <option value="alphanum">Alphanumeric</option>
+                <option value="pin">Numeric PIN (0-9)</option>
+              </select>
+            </div>
+
+            <button class="btn-primary" id="gen-btn" onclick="triggerGenerate()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+              Generate Protocol
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Hidden canvas for capturing original video frames -->
+<canvas id="frameCanvas"></canvas>
+
+<!-- Define Module BEFORE linking emscripten JS -->
+<script>
+var Module = {
+  onRuntimeInitialized: function() {
+    window.wasmReady = true;
+    document.getElementById('engine-text').textContent = 'Engine Online';
+    document.getElementById('engine-dot').classList.add('online');
+    console.log('[ENTROPI-7] WASM initialized.');
+    startEntropyPreview();
+  }
+};
+</script>
+<script src="engine.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DOM ELEMENTS & STATE
+═══════════════════════════════════════════════ */
+const video = document.getElementById('camFeed');
+const frameCanvas = document.getElementById('frameCanvas');
+const noiseCanvas = document.getElementById('noiseCanvas');
+let lastPassword = '';
+
+/* ═══════════════════════════════════════════════
+   UI INTERACTIONS
+═══════════════════════════════════════════════ */
+document.getElementById('passLen').addEventListener('input', e => {
+  document.getElementById('len-display').textContent = e.target.value;
+});
+
+function toggleWorking() {
+  const c = document.getElementById('working-container');
+  c.style.display = c.style.display === 'block' ? 'none' : 'block';
+}
+
+function setSensorStatus(msg, error = false) {
+  const el = document.getElementById('sensor-status');
+  el.textContent = msg;
+  el.style.color = error ? 'var(--error)' : 'var(--text-muted)';
+}
+
+/* ═══════════════════════════════════════════════
+   CAMERA INIT
+═══════════════════════════════════════════════ */
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 320, height: 240, facingMode: 'environment' },
+      audio: false
+    });
+    video.srcObject = stream;
+    setSensorStatus('Streaming live photonic data...');
+  } catch (e) {
+    setSensorStatus('Camera access denied.', true);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   FRAME & NOISE PROCESSING (Live Loop)
+═══════════════════════════════════════════════ */
+function grabFrame() {
+  const w = video.videoWidth || 320;
+  const h = video.videoHeight || 240;
+  if (!w || !h) return null;
+  frameCanvas.width = noiseCanvas.width = w;
+  frameCanvas.height = noiseCanvas.height = h;
+  const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
+}
+
+function startEntropyPreview() {
+  setInterval(() => {
+    if (!window.wasmReady || !video.videoWidth) return;
+    
+    const frame = grabFrame();
+    if (!frame) return;
+    
+    const { data: pixels, width: w, height: h } = frame;
+    const nBytes = pixels.length;
+    
+    /* Determine visualization mode (0 = LSB, 1 = Heatmap) */
+    const renderMode = parseInt(document.getElementById('renderMode').value, 10) || 0;
+
+    /* 1. Allocate WASM memory for input and output buffers */
+    const inPtr = Module._malloc(nBytes);
+    const outPtr = Module._malloc(nBytes);
+    
+    /* 2. Copy camera frame to input pointer */
+    Module.HEAPU8.set(pixels, inPtr);
+
+    /* 3. Run dry generator pass to measure entropy (length=1) */
+    Module.ccall('generate_password', 'number', 
+      ['number','number','number','number','number'], 
+      [inPtr, w, h, 1, 0]
+    );
+
+    /* 4. Generate Visual Map */
+    Module.ccall('get_sensor_map', null,
+      ['number','number','number','number','number'],
+      [inPtr, outPtr, w, h, renderMode]
+    );
+
+    /* 5. Read back map output data */
+    const outData = new Uint8ClampedArray(Module.HEAPU8.buffer, outPtr, nBytes);
+    const mapImg = new ImageData(outData, w, h);
+    
+    /* 6. Render map to Canvas */
+    const nCtx = noiseCanvas.getContext('2d');
+    nCtx.putImageData(mapImg, 0, 0);
+
+    /* 7. Read engine metrics */
+    const pct = Module.ccall('get_entropy_percent', 'number', [], []);
+    document.getElementById('entropy-pct').textContent = `${pct}% Noise`;
+
+    if (pct < 20) {
+      document.getElementById('entropy-pct').style.color = 'var(--error)';
+      setSensorStatus('Warning: Low entropy detected (mostly static image)', true);
+    } else {
+      document.getElementById('entropy-pct').style.color = 'var(--accent)';
+      setSensorStatus('Sensor streaming live photonic data...');
+    }
+
+    Module._free(inPtr);
+    Module._free(outPtr);
+  }, 100); /* 10 FPS for the map preview */
+}
+
+/* ═══════════════════════════════════════════════
+   GENERATOR PIPELINE
+═══════════════════════════════════════════════ */
+function updateMathPanel(password) {
+  /* Fetch split 64-bit state */
+  const hi = Module.ccall('get_last_state_hi', 'number', [], []);
+  const lo = Module.ccall('get_last_state_lo', 'number', [], []);
+  
+  /* Construct Hex representation (pad to 8 chars each) */
+  const hex = '0x' + (hi >>> 0).toString(16).padStart(8, '0') + 
+                   (lo >>> 0).toString(16).padStart(8, '0');
+  
+  document.getElementById('trace-state').textContent = hex;
+  
+  /* Fetch avalanche score */
+  const avalanche = Module.ccall('get_avalanche_score', 'number', [], []);
+  document.getElementById('avalanche-score').textContent = `${avalanche}%`;
+  if (avalanche >= 48 && avalanche <= 52) {
+    document.getElementById('avalanche-score').style.color = 'var(--accent)';
+  } else {
+    document.getElementById('avalanche-score').style.color = 'var(--text-main)';
+  }
+
+  /* Show mock trace mapping */
+  const charSamples = password.substring(0, 3).split('');
+  const traceStr = charSamples.map((c, i) => `state[${i}] -> '${c}'`).join(' | ') + '...';
+  document.getElementById('trace-extraction').textContent = traceStr;
+}
+
+async function triggerGenerate() {
+  if (!window.wasmReady || !video.videoWidth) return;
+  
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Processing...';
+
+  try {
+    const frame = grabFrame();
+    const { data: pixels, width: w, height: h } = frame;
+    const nBytes = pixels.length;
+    
+    /* Get parameters */
+    const targetLen = parseInt(document.getElementById('passLen').value, 10);
+    const modeKey = document.getElementById('charsetMode').value;
+    const modes = { full: 0, alpha: 1, alphanum: 2, pin: 3 };
+    const charsetModeVal = modes[modeKey] !== undefined ? modes[modeKey] : 0;
+    
+    /* Allocate input and perform C engine call */
+    const inPtr = Module._malloc(nBytes);
+    Module.HEAPU8.set(pixels, inPtr);
+
+    const resultPtr = Module.ccall('generate_password', 'number',
+      ['number','number','number','number','number'],
+      [inPtr, w, h, targetLen, charsetModeVal]
+    );
+
+    const pct = Module.ccall('get_entropy_percent', 'number', [], []);
+
+    if (!resultPtr || pct < 20) {
+      document.getElementById('password-display').innerHTML = '<span class="text-error">Insufficient Entropy</span>';
+    } else {
+      let raw = Module.UTF8ToString(resultPtr);
+      
+      lastPassword = raw;
+      document.getElementById('password-display').textContent = raw;
+      
+      /* Update the Live Math Traces */
+      updateMathPanel(raw);
+    }
+
+    Module._free(inPtr);
+  } catch (e) {
+    console.error(e);
+  }
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Generate Protocol`;
+  }, 200);
+}
+
+function copyPassword() {
+  if (!lastPassword) return;
+  navigator.clipboard.writeText(lastPassword);
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = 'Copied';
+  setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') triggerGenerate(); });
+
+/* Kickoff */
+startCamera();
+</script>
+
+</body>
+</html>
