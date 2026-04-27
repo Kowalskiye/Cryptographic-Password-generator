@@ -228,6 +228,7 @@ void get_sensor_map(const uint8_t *in_buf, uint8_t *out_buf, int width, int heig
         }
     }
 }
+/*ENCYPTION KEY DATA FOR FUTURE DEPLOYMENT AND ENHANCEMENT*/
 /*A9f$2Lm#qP7@zR!aB4kT8vYw3C%uD0sE6HjN5gM^1*oW&lKpZxQyU+F=VhJrI-cAObSnGtPeRdL8fJ2@dLz!xQW#eR7tY%uIoP^aS&gH*jK(l)Z0XvC-bN=mDqE1rF4T6y9U3w5kMpnOcsA2B7G8Vh
 q2eW4rT6yU8iO0pA1sD3fG5hJ7kL9zXcVbNmQwErTyUiOpAsDfGhJkLzXcVbNm1234567890!@#ZxCvBnMqWeRtYuIoPaSdFgHjKl1234567890!@#$%^&*()_+-=[]{}|;:',.<>?/AaBbCcDdEeFf
 7yHn$2kL!pQwErT#9mXcV%zAqWsEdRfTgY^uIoP&lKjH*gFdS(aZ)xC-vBnM=QwErTyUiOpAsDf3kLmN!pQrStUvWxYz@#1234567890AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWw
