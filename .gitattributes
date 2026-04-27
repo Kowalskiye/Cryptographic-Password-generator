@@ -1,5 +1,3 @@
-# Tell GitHub's language detection (Linguist) to ignore these files
-# This makes the repository correctly report as ~100% C language.
 *.html linguist-vendored
 *.css linguist-vendored
 *.js linguist-vendored
